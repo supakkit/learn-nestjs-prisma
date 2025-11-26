@@ -205,9 +205,82 @@ export class PrismaModule {}
 ```
 ตอนนี้เราก็จะได้ Prisma service ที่พร้อมเรียกใช้งานใน application ของเราแล้ว
 
-## Input Validation & Transformation
-ใช้ built-in NestJS `validationPipe` และกำหนด rules โดยใช้ `class-validator` package:
+
+## Authentication
+ติดตั้ง packages ที่จำเป็น สำหรับการทำ authentication ด้วย Passport:
 ```shell
-npm install class-validator class-transformer
+npm install --save @nestjs/passport passport passport-local
+npm install --save-dev @types/passport-local
+```
+รวมทั้งติดตั้ง `@nestjs/config` เพื่อใช้สำหรับดึง environment variables มาใช้งานใน NestJS app:
+```shell
+npm install --save @nestjs/config
+```
+การตั้งค่า secret key สำหรับ JWT secret จะทำต่างจากในบทความเล็กน้อยเพื่อให้เป็นไปตาม pattern ที่สามารถใช้ใน production ได้ โดยจะกำหนด `JWT_SECRET` ไว้ใน `.env` file แล้วทำการโหลดเข้ามาใช้งาน แทนการกำหนด secret key ไว้ภายใน code โดยตรงตามบทความ
+
+ก่อนอื่นเริ่มจากการสร้าง secret key ก่อน โดยในที่นี้จะใช้ the built-in Node.js `crypto` module
+โดยรันคำสั่งต่อไปนี้ใน terminal เพื่อสร้าง secret key:
+```shell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+จากนั้นนำ secret key ที่ได้ไปใส่ใน `.env` file เป็นค่า value ของ `JWT_SECRET`
+```
+JWT_SECRET=your_generated_secret_key_here
 ```
 
+ใน `app.module.ts` ทำการ import และ register the `ConfigModule` โดยใช้ `ConfigModule.forRoot()` เพื่อโหลดและอ่านค่า environment variables ซึ่งโดยค่าเริ่มต้นจะอ่านจาก `.env` file ใน project root directory:
+```ts
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { ArticlesModule } from './articles/articles.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true, // Makes the ConfigService available everywhere
+    }),
+    PrismaModule,
+    ArticlesModule,
+    UsersModule,
+    AuthModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+จากนั้น inject และใช้งาน `ConfigService` ใน `auth.module.ts` file:
+```ts
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { PrismaModule } from 'src/prisma/prisma.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+
+@Module({
+  imports: [
+    PrismaModule,
+    PassportModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '60m' },
+      }),
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService],
+})
+export class AuthModule {}
+```
