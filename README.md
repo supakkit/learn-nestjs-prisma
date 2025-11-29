@@ -1018,12 +1018,30 @@ bootstrap();
 ในหัวข้อนี้เป็นส่วนที่เพิ่มเติมขึ้นมานอกเหนือจากเนื่อหาในบทความที่เราใช้อ้างอิง โดยจะเพิ่มการ `GET /profile` route และเพิ่มการเปลี่ยนการเก็บ token มาไว้ที่ cookie ซึ่งอ้างอิงเนื้อหาจากบทความ: [มาทำ Authentication ด้วย NestJS และ Passport กัน](https://mikelopster.dev/posts/nestjs-passport/)
 
 ### เพิ่ม `GET /users/profile` route
-ไปที่ `user/users.controller.ts` file แล้วเพิ่ม `GET users/profile` route ขึ้นมา:
+สร้าง `auth/interfaces` directory ขึ้นมา และสร้าง `auth-request.interface.ts` file:
+```shell
+mkdir src/auth/interfaces
+touch src/auth/interfaces/auth-request.interface.ts
+```
+
+จากนั้นใน `auth-request.interface.ts` file ให้สร้าง type ดังนี้:
+```ts
+import { Request } from 'express';
+
+export interface AuthRequest extends Request {
+  user: {
+    userId: string;
+  };
+}
+```
+
+ต่อมาไปที่ `user/users.controller.ts` file แล้วเพิ่ม `GET users/profile` route ขึ้นมา:
 ```ts
 import {
   // ...
   Request,
 } from '@nestjs/common';
+import type { AuthRequest } from 'src/auth/interfaces/auth-request.interface';
 
 // ...
 
@@ -1036,8 +1054,9 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ type: UserEntity })
-  async getProfile(@Request() req) {
-    const user = await this.usersService.findOne(req.userId);
+  async getProfile(@Request() req: AuthRequest) {
+    const user = await this.usersService.findOne(req.user.userId);
+    if (!user) throw new NotFoundException('User not found');
     return new UserEntity(user);
   }
 
