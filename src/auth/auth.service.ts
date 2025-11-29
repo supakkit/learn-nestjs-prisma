@@ -4,20 +4,25 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { UsersService } from 'src/users/users.service';
 import { AuthEntity } from './entities/auth.entity';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
+    private usersService: UsersService,
     private jwtService: JwtService,
   ) {}
 
+  async signup(createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
+  }
+
   async login(email: string, password: string): Promise<AuthEntity> {
     // Fetch a user with the given email
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.usersService.findByEmail(email);
 
     // If no user is found, throw an error
     if (!user) {

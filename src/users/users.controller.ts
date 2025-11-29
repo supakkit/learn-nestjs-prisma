@@ -49,7 +49,7 @@ export class UsersController {
   @ApiOkResponse({ type: UserEntity })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findOne(id);
-    if (!user) throw new NotFoundException('User id not found');
+    if (!user) throw new NotFoundException('User not found');
     return new UserEntity(user);
   }
 
